@@ -21,14 +21,18 @@ class Budget(Base):
 
     category = Column(String, nullable=False, index=True)
 
-    # budget limit
+    # ✅ budget limit (FIXED NAME USED IN SCHEDULER)
     limit_amount = Column(Numeric(12, 2), nullable=False)
 
-    # amount already spent
-    spent_amount = Column(Numeric(12, 2), default=0)
+    # ✅ amount already spent (default safe)
+    spent_amount = Column(Numeric(12, 2), default=0, nullable=False)
 
-    # month format: YYYY-MM
+    # ✅ month format: YYYY-MM
     month = Column(String(7), nullable=False, index=True)
 
     # Relationships
     user = relationship("User", back_populates="budgets")
+
+    # ✅ OPTIONAL: helper method (useful in future)
+    def is_exceeded(self):
+        return float(self.spent_amount) > float(self.limit_amount)

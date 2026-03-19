@@ -1,9 +1,11 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routes import auth, accounts, transactions, budgets, bills, rewards, alerts, insights, categories
-from app.services.reminder_service import start_scheduler
-from app.routes import currency
+from app.routes import auth, accounts, transactions, budgets, bills, rewards, alerts, insights, categories, currency
+import app.routes.export as export
+# ✅ Scheduler (Step 4)
+from app.services.scheduler import start_scheduler
+
 
 app = FastAPI(
     title="Digital Banking API",
@@ -11,14 +13,16 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# ---------------- CORS Middleware ----------------A
+
+# ---------------- CORS Middleware ----------------
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],   # ⚠️ restrict in production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 # ---------------- Register Routes ----------------
 app.include_router(auth.router, prefix="", tags=["Auth"])
@@ -28,12 +32,21 @@ app.include_router(budgets.router, prefix="/budgets", tags=["Budgets"])
 app.include_router(bills.router, prefix="/bills", tags=["Bills"])
 app.include_router(rewards.router, prefix="/rewards", tags=["Rewards"])
 app.include_router(alerts.router, prefix="/alerts", tags=["Alerts"])
+
+# ✅ Insights
 app.include_router(insights.router, prefix="/insights", tags=["Insights"])
+
 app.include_router(categories.router, prefix="", tags=["Categories"])
 app.include_router(currency.router, prefix="/currency", tags=["Currency"])
-# ---------------- Start Scheduler ----------------
+
+# ✅ NEW: Export APIs (Step 5)
+app.include_router(export.router)
+
+
+# ---------------- Start Background Scheduler ----------------
 @app.on_event("startup")
 def start_background_tasks():
+    print("🚀 Starting background scheduler...")
     start_scheduler()
 
 

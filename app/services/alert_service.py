@@ -38,7 +38,6 @@ class AlertService:
         if float(budget.spent_amount) <= float(budget.limit_amount):
             return None
 
-        # Prevent duplicate per month
         existing = self.db.query(Alert).filter(
             Alert.user_id == user_id,
             Alert.alert_type == self.ALERT_TYPE_BUDGET_EXCEEDED,
@@ -84,7 +83,6 @@ class AlertService:
         for acc in accounts:
             if acc.balance < 1000:
 
-                # Prevent duplicate per day
                 existing = self.db.query(Alert).filter(
                     Alert.user_id == user_id,
                     Alert.alert_type == self.ALERT_TYPE_LOW_BALANCE,
@@ -109,7 +107,7 @@ class AlertService:
         self.db.commit()
         return alerts
 
-    # ================= BILL DUE (🔥 FIXED STRONG DUPLICATE LOGIC) =================
+    # ================= BILL DUE (✅ FULLY FIXED) =================
     def check_bill_due(self, user_id: int) -> List[Alert]:
         alerts = []
         upcoming = datetime.utcnow() + timedelta(days=3)
@@ -122,21 +120,32 @@ class AlertService:
 
         for bill in bills:
 
-            # Handle both schema types
+            # ✅ Check unpaid safely
             is_unpaid = False
             if hasattr(bill, "is_paid"):
-                is_unpaid = (bill.is_paid == False)
+                is_unpaid = (bill.is_paid is False)
             elif hasattr(bill, "status"):
                 is_unpaid = (bill.status != "Paid")
 
             if not is_unpaid:
                 continue
 
-            # 🔥 STRONG duplicate prevention (per bill per day)
+            # ✅ SAFE bill name (NO MORE ERROR)
+            bill_name = getattr(bill, "biller_name", None) \
+                        or getattr(bill, "name", None) \
+                        or getattr(bill, "title", None) \
+                        or "Bill"
+
+            # ✅ SAFE amount
+            amount = getattr(bill, "amount_due", None) \
+                     or getattr(bill, "amount", None) \
+                     or 0
+
+            # ✅ Prevent duplicates
             existing = self.db.query(Alert).filter(
                 Alert.user_id == user_id,
                 Alert.alert_type == self.ALERT_TYPE_BILL_DUE,
-                Alert.message.contains(bill.biller_name),
+                Alert.message.contains(str(bill_name)),
                 func.date(Alert.created_at) == today
             ).first()
 
@@ -145,8 +154,8 @@ class AlertService:
 
             alert = Alert(
                 user_id=user_id,
-                title=f"Bill Due: {bill.biller_name}",
-                message=f"{bill.biller_name} bill of ₹{bill.amount_due} is due on {bill.due_date.date()}",
+                title=f"Bill Due: {bill_name}",
+                message=f"{bill_name} bill of ₹{amount} is due on {bill.due_date.date()}",
                 alert_type=self.ALERT_TYPE_BILL_DUE,
                 is_read=False
             )
@@ -157,7 +166,7 @@ class AlertService:
         self.db.commit()
         return alerts
 
-    # ================= RUN ALL CHECKS =================
+    # ================= RUN ALL =================
     def generate_all_alerts(self, user_id: int) -> Dict:
         created = []
 

@@ -11,25 +11,14 @@ router = APIRouter(tags=["Bills"])
 
 # ================= HELPER FUNCTION =================
 def determine_bill_status(bill: Bill) -> str:
-    """
-    Determine bill status dynamically:
-    - Paid → if is_paid True OR status == "paid"
-    - Upcoming → future due date
-    - Pending → past due date and not paid
-    """
     now = datetime.utcnow()
 
-    # Paid
-    if hasattr(bill, "is_paid") and bill.is_paid:
-        return "Paid"
-    if hasattr(bill, "status") and bill.status and bill.status.lower() == "paid":
+    if bill.is_paid:
         return "Paid"
 
-    # Upcoming
-    if bill.due_date > now:
+    if bill.due_date and bill.due_date > now:
         return "Upcoming"
 
-    # Pending
     return "Pending"
 
 
@@ -37,20 +26,18 @@ def determine_bill_status(bill: Bill) -> str:
 @router.post("/", response_model=BillResponse)
 def create_bill(bill: BillCreate, db: Session = Depends(get_db)):
 
-    if not bill.biller_name.strip():
-        raise HTTPException(status_code=400, detail="Biller name cannot be empty")
+    if not bill.name.strip():
+        raise HTTPException(status_code=400, detail="Bill name cannot be empty")
 
-    if bill.amount_due <= 0:
+    if bill.amount <= 0:
         raise HTTPException(status_code=400, detail="Amount must be positive")
 
     new_bill = Bill(
         user_id=bill.user_id,
-        biller_name=bill.biller_name,
-        amount_due=bill.amount_due,
+        name=bill.name,             # ✅ FIXED
+        amount=bill.amount,         # ✅ FIXED
         due_date=bill.due_date,
-        status="Upcoming",   # ✅ consistent casing
-        auto_pay=False,
-        is_paid=False        # ✅ ensure exists
+        is_paid=False               # ✅ FIXED
     )
 
     db.add(new_bill)
@@ -66,11 +53,9 @@ def get_bills(user_id: int = Query(...), db: Session = Depends(get_db)):
 
     bills = db.query(Bill).filter(Bill.user_id == user_id).all()
 
+    # Add dynamic status (not stored in DB)
     for bill in bills:
-        # ✅ dynamically assign correct status
         bill.status = determine_bill_status(bill)
-
-    db.commit()
 
     return bills
 
@@ -88,16 +73,15 @@ def update_bill(
     if not existing_bill:
         raise HTTPException(status_code=404, detail="Bill not found")
 
-    if not bill.biller_name.strip():
-        raise HTTPException(status_code=400, detail="Biller name cannot be empty")
+    if not bill.name.strip():
+        raise HTTPException(status_code=400, detail="Bill name cannot be empty")
 
-    if bill.amount_due <= 0:
+    if bill.amount <= 0:
         raise HTTPException(status_code=400, detail="Amount must be positive")
 
-    existing_bill.biller_name = bill.biller_name
-    existing_bill.amount_due = bill.amount_due
+    existing_bill.name = bill.name              # ✅ FIXED
+    existing_bill.amount = bill.amount          # ✅ FIXED
     existing_bill.due_date = bill.due_date
-    existing_bill.auto_pay = bill.auto_pay
 
     db.commit()
     db.refresh(existing_bill)
@@ -121,11 +105,7 @@ def pay_bill(
     if not bill:
         raise HTTPException(status_code=404, detail="Bill not found")
 
-    # ✅ mark as paid
-    if hasattr(bill, "is_paid"):
-        bill.is_paid = True
-
-    bill.status = "Paid"
+    bill.is_paid = True   # ✅ FIXED
 
     db.commit()
 

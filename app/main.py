@@ -1,10 +1,17 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routes import auth, accounts, transactions, budgets, bills, rewards, alerts, insights, categories, currency
+from app.routes import (
+    auth, accounts, transactions, budgets,
+    bills, rewards, alerts, insights, categories, currency
+)
 import app.routes.export as export
-# ✅ Scheduler (Step 4)
+
+# ✅ Scheduler
 from app.services.scheduler import start_scheduler
+
+# ✅ IMPORTANT: DB setup
+from app.database import Base, engine
 
 
 app = FastAPI(
@@ -39,14 +46,19 @@ app.include_router(insights.router, prefix="/insights", tags=["Insights"])
 app.include_router(categories.router, prefix="", tags=["Categories"])
 app.include_router(currency.router, prefix="/currency", tags=["Currency"])
 
-# ✅ NEW: Export APIs (Step 5)
+# ✅ Export APIs
 app.include_router(export.router)
 
 
-# ---------------- Start Background Scheduler ----------------
+# ---------------- Startup Event ----------------
 @app.on_event("startup")
 def start_background_tasks():
     print("🚀 Starting background scheduler...")
+
+    # ✅ FIX: CREATE ALL TABLES (VERY IMPORTANT)
+    Base.metadata.create_all(bind=engine)
+
+    # ✅ Start scheduler
     start_scheduler()
 
 

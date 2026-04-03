@@ -1,6 +1,5 @@
-from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, Boolean
+from sqlalchemy import Column, Integer, String, Numeric, DateTime, Boolean, ForeignKey
 from sqlalchemy.orm import relationship
-from datetime import datetime
 from app.database import Base
 
 
@@ -9,17 +8,14 @@ class Bill(Base):
 
     id = Column(Integer, primary_key=True, index=True)
 
-    user_id = Column(Integer, ForeignKey("users.id"))
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
 
-    biller_name = Column(String, nullable=False)
-    amount_due = Column(Float, nullable=False)
+    name = Column(String, nullable=False)
+    amount = Column(Numeric(10, 2), nullable=False)
+    due_date = Column(DateTime, nullable=True)
 
-    due_date = Column(DateTime, nullable=False)
+    # ✅ FIX 1: Add missing column
+    is_paid = Column(Boolean, default=False)
 
-    status = Column(String, default="upcoming")
-
-    auto_pay = Column(Boolean, default=False)
-
-    created_at = Column(DateTime, default=datetime.utcnow)
-
+    # ✅ FIX 2: Add relationship (VERY IMPORTANT)
     user = relationship("User", back_populates="bills")
